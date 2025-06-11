@@ -1,0 +1,9 @@
+*.exe
+*.dll
+*.pdb
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+.idea/
+.venv/ 

@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - app-net
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: kpo3sql
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-net
+
+  payments_service:
+    build:
+      context: ./PaymentsService
+      dockerfile: Dockerfile
+    container_name: payments_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DB_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/kpo3sql"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+    ports:
+      - "8001:8000"
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  orders_service:
+    build:
+      context: ./OrdersService
+      dockerfile: Dockerfile
+    container_name: orders_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DB_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/kpo3sql"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+    ports:
+      - "8002:8000"
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api_gateway:
+    build:
+      context: ./ApiGateway
+      dockerfile: Dockerfile
+    container_name: api_gateway
+    depends_on:
+      - orders_service
+      - payments_service
+    environment:
+      ORDERS_SERVICE_URL: "http://orders_service:8000"
+      PAYMENTS_SERVICE_URL: "http://payments_service:8000"
+    ports:
+      - "8005:8000"
+    networks:
+      - app-net
+
+  frontend:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api_gateway
+    networks:
+      - app-net
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
+networks:
+  app-net:
+    driver: bridge

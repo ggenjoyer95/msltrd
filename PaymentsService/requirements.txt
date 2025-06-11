@@ -1,0 +1,14 @@
+pytest
+pytest-cov
+httpx
+uvicorn==0.27.1
+sqlalchemy==2.0.27
+pathlib
+fastapi==0.109.2
+python-multipart
+psycopg2-binary
+aio-pika==9.3.1
+pydantic==2.6.1
+asyncpg==0.29.0
+pydantic-settings==2.2.1
+backoff

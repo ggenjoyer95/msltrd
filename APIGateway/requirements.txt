@@ -1,0 +1,12 @@
+pytest
+pytest-cov
+httpx
+uvicorn[standard]
+sqlalchemy
+pathlib
+fastapi
+python-multipart
+psycopg2-binary
+aio-pika
+pydantic
+asyncpg
